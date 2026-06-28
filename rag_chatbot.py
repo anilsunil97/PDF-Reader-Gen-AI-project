@@ -65,15 +65,15 @@ def load_excel_bytes(file_bytes: bytes) -> str:
 
 
 def load_image_bytes(file_bytes: bytes) -> str:
+    """OCR is not available on Streamlit Cloud — return a friendly message."""
     try:
         import pytesseract
         from PIL import Image
         img = Image.open(io.BytesIO(file_bytes))
         return pytesseract.image_to_string(img)
-    except ImportError:
-        return "[OCR not available: pytesseract is not installed on this server]"
-    except Exception as e:
-        return f"[Image OCR failed: {e}]"
+    except Exception:
+        # Graceful fallback — the app still works, just can't read image text
+        return "[Image uploaded but OCR is not available on this server. Please upload a PDF or text file instead.]"
 
 
 def load_bytes(file_bytes: bytes, filename: str) -> str:
