@@ -1,0 +1,12 @@
+# Environment & secrets — never commit these
+.env
+.streamlit/secrets.toml
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Temp / OS files
+.DS_Store
+Thumbs.db

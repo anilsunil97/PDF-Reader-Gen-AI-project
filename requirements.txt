@@ -1,0 +1,9 @@
+requests==2.33.1
+python-dotenv==1.2.1
+scikit-learn==1.9.0
+numpy==2.4.2
+pypdf==6.14.2
+streamlit==1.58.0
+pandas==3.0.2
+openpyxl==3.1.5
+Pillow==12.2.0
