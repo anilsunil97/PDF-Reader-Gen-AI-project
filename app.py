@@ -80,7 +80,11 @@ st.markdown(
 
 # ── Session state ─────────────────────────────────────────────────────────────
 if "bot" not in st.session_state:
-    st.session_state.bot = RAGChatbot()
+    try:
+        st.session_state.bot = RAGChatbot()
+    except Exception as e:
+        st.session_state.bot = None
+        st.session_state._bot_error = str(e)
 
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
@@ -152,6 +156,17 @@ st.markdown(
     "<p style='color:#7a8499; margin-top:-10px'>Upload a document on the left, then ask anything about it.</p>",
     unsafe_allow_html=True,
 )
+
+# Show a clear error if the bot failed to initialise (e.g. missing API key)
+if st.session_state.bot is None or not st.session_state.bot.is_ready():
+    st.error(
+        "**API key not found.** "
+        "Go to your Streamlit Cloud app → **Settings → Secrets** and add:\n\n"
+        "```toml\nOPENROUTER_API_KEY = \"sk-or-v1-...\"\n```\n\n"
+        "Then click **Reboot app**.",
+        icon="🔑",
+    )
+    st.stop()
 
 # ── Chat history display ──────────────────────────────────────────────────────
 with st.container():
