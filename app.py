@@ -9,7 +9,7 @@ from rag_chatbot import RAGChatbot
 
 # ── Page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="RAG Document Chatbot",
+    page_title="Document Chat Bot",
     page_icon="🤖",
     layout="wide",
 )
@@ -146,12 +146,12 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown(
-        "<small style='color:#4a5280'>Powered by OpenRouter · TF-IDF RAG</small>",
+        "<small style='color:#4a5280'>Document Chat Bot · Powered by OpenRouter</small>",
         unsafe_allow_html=True,
     )
 
 # ── Main panel ────────────────────────────────────────────────────────────────
-st.markdown("## 🤖 RAG Document Chatbot")
+st.markdown("## 🤖 Document Chat Bot")
 st.markdown(
     "<p style='color:#7a8499; margin-top:-10px'>Upload a document on the left, then ask anything about it.</p>",
     unsafe_allow_html=True,
