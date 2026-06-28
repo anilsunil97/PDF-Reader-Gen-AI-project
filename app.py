@@ -197,22 +197,8 @@ with st.container():
                     f"<div class='chat-bot'>{content}</div>",
                     unsafe_allow_html=True,
                 )
-                if entry.get("used_fallback"):
-                    st.markdown(
-                        "<div style='font-size:0.72rem; color:#7a8499; margin-top:2px'>"
-                        "⚡ Broad search used (no exact keyword match)</div>",
-                        unsafe_allow_html=True,
-                    )
-                if entry.get("chunks"):
-                    with st.expander("🔍 View retrieved context chunks"):
-                        for i, chunk in enumerate(entry["chunks"], 1):
-                            st.markdown(
-                                f"<div style='background:#10131e; border:1px solid #2e3250; "
-                                f"border-radius:6px; padding:8px 12px; margin-bottom:6px; "
-                                f"font-size:0.82rem; color:#9aa3b8'>"
-                                f"<b>Chunk {i}</b><br>{chunk}</div>",
-                                unsafe_allow_html=True,
-                            )
+
+
 
 # ── Input row ─────────────────────────────────────────────────────────────────
 st.markdown("<br>", unsafe_allow_html=True)
