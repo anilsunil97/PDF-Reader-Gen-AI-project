@@ -1,3 +1,1 @@
-# System-level packages for Streamlit Cloud
-# Tesseract is listed here so image OCR works on the cloud too
 tesseract-ocr
