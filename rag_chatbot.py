@@ -1,13 +1,11 @@
 """
-RAG-based Document Q&A Chatbot
---------------------------------
+Document Chat Bot — RAG pipeline powered by Google Gemini
+----------------------------------------------------------
 Supported file types:
 - PDF  (.pdf)
 - Excel (.xlsx, .xls)
 - Image (.jpg, .jpeg, .png) — OCR via pytesseract if available
 - Plain text (.txt)
-
-Author: Anil Kumar
 """
 
 import os
@@ -20,27 +18,29 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from pypdf import PdfReader
 
-# Load .env for local development (no-op on Streamlit Cloud)
 load_dotenv()
+
+# ── Gemini API config ─────────────────────────────────────────────────────────
+GEMINI_API_URL = (
+    "https://generativelanguage.googleapis.com/v1beta/models/"
+    "gemini-2.0-flash:generateContent"
+)
+DEFAULT_MODEL = "gemini-2.0-flash"
 
 
 def _get_api_key() -> Optional[str]:
     """
-    Resolve the OpenRouter API key.
+    Resolve the Gemini API key.
     Priority: Streamlit secrets (cloud) -> .env / environment variable (local).
     """
     try:
         import streamlit as st
-        key = st.secrets.get("OPENROUTER_API_KEY")
+        key = st.secrets.get("GEMINI_API_KEY")
         if key:
             return str(key)
     except Exception:
         pass
-    return os.environ.get("OPENROUTER_API_KEY")
-
-
-OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
-DEFAULT_MODEL = "anthropic/claude-sonnet-4.5"
+    return os.environ.get("GEMINI_API_KEY")
 
 
 # ---------- 1. DOCUMENT LOADING ----------
@@ -65,14 +65,12 @@ def load_excel_bytes(file_bytes: bytes) -> str:
 
 
 def load_image_bytes(file_bytes: bytes) -> str:
-    """OCR is not available on Streamlit Cloud — return a friendly message."""
     try:
         import pytesseract
         from PIL import Image
         img = Image.open(io.BytesIO(file_bytes))
         return pytesseract.image_to_string(img)
     except Exception:
-        # Graceful fallback — the app still works, just can't read image text
         return "[Image uploaded but OCR is not available on this server. Please upload a PDF or text file instead.]"
 
 
@@ -145,7 +143,7 @@ class VectorStore:
         self.__init__()
 
 
-# ---------- 4. LLM ----------
+# ---------- 4. GEMINI LLM ----------
 
 def build_prompt(question: str, contexts: List[str], used_fallback: bool = False) -> str:
     context_block = "\n\n---\n\n".join(contexts)
@@ -175,26 +173,33 @@ def get_answer(
 
     prompt = build_prompt(question, contexts, used_fallback)
 
+    url = f"{GEMINI_API_URL}?key={api_key}"
+
     response = requests.post(
-        url=OPENROUTER_API_URL,
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
+        url=url,
+        headers={"Content-Type": "application/json"},
         json={
-            "model": model,
-            "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 600,
+            "contents": [
+                {"parts": [{"text": prompt}]}
+            ],
+            "generationConfig": {
+                "maxOutputTokens": 600,
+                "temperature": 0.2,
+            },
         },
         timeout=60,
     )
 
     if response.status_code != 200:
         raise RuntimeError(
-            f"OpenRouter API error ({response.status_code}): {response.text}"
+            f"Gemini API error ({response.status_code}): {response.text}"
         )
 
-    return response.json()["choices"][0]["message"]["content"]
+    data = response.json()
+    try:
+        return data["candidates"][0]["content"]["parts"][0]["text"]
+    except (KeyError, IndexError) as e:
+        raise RuntimeError(f"Unexpected Gemini response format: {data}") from e
 
 
 # ---------- 5. CHATBOT ----------
@@ -204,8 +209,6 @@ class RAGChatbot:
         self.store = VectorStore()
         self.api_key = api_key or _get_api_key()
         self.model = model
-        # NOTE: we do NOT raise here if key is missing —
-        # the Streamlit app will show a friendly error instead of crashing.
 
     def is_ready(self) -> bool:
         return bool(self.api_key)
@@ -224,7 +227,7 @@ class RAGChatbot:
         if not self.api_key:
             return {
                 "question": question,
-                "answer": "⚠️ API key not configured. Please add OPENROUTER_API_KEY to Streamlit secrets.",
+                "answer": "⚠️ API key not configured. Please add GEMINI_API_KEY to Streamlit secrets.",
                 "retrieved_chunks": [],
                 "used_fallback": False,
             }
@@ -246,7 +249,7 @@ class RAGChatbot:
 if __name__ == "__main__":
     bot = RAGChatbot()
     if not bot.is_ready():
-        print("ERROR: No OPENROUTER_API_KEY found in environment.")
+        print("ERROR: No GEMINI_API_KEY found in environment.")
         exit(1)
 
     sample_docs = ["sample_data/company_handbook.txt"]
@@ -255,7 +258,7 @@ if __name__ == "__main__":
             n = bot.ingest(doc)
             print(f"Loaded {doc} -> {n} chunks")
 
-    print("\nRAG Chatbot ready. Type 'exit' to quit.\n")
+    print("\nDocument Chat Bot ready. Type 'exit' to quit.\n")
     while True:
         q = input("You: ")
         if q.lower() == "exit":

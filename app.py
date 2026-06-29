@@ -146,7 +146,7 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown(
-        "<small style='color:#4a5280'>Document Chat Bot · Powered by OpenRouter</small>",
+        "<small style='color:#4a5280'>Document Chat Bot · Powered by Gemini</small>",
         unsafe_allow_html=True,
     )
 
@@ -162,7 +162,7 @@ if st.session_state.bot is None or not st.session_state.bot.is_ready():
     st.error(
         "**API key not found.** "
         "Go to your Streamlit Cloud app → **Settings → Secrets** and add:\n\n"
-        "```toml\nOPENROUTER_API_KEY = \"sk-or-v1-...\"\n```\n\n"
+        "```toml\nGEMINI_API_KEY = \"your-gemini-api-key\"\n```\n\n"
         "Then click **Reboot app**.",
         icon="🔑",
     )
