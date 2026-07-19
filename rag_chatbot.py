@@ -20,26 +20,26 @@ from pypdf import PdfReader
 
 load_dotenv()
 
-# ── Hugging Face Inference API config ────────────────────────────────────────
-# Free tier: https://huggingface.co/settings/tokens
-# Model: Mistral-7B-Instruct — fast, capable, free on HF Inference API
-DEFAULT_MODEL = "mistralai/Mistral-7B-Instruct-v0.3"
-HF_API_URL = f"https://api-inference.huggingface.co/models/{DEFAULT_MODEL}"
+# ── Groq API config ───────────────────────────────────────────────────────────
+# Free tier: https://console.groq.com  (no credit card required)
+# Model: llama-3.1-8b-instant — very fast, free, works on all cloud platforms
+GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
+DEFAULT_MODEL = "llama-3.1-8b-instant"
 
 
 def _get_api_key() -> Optional[str]:
     """
-    Resolve the Hugging Face API token.
+    Resolve the Groq API key.
     Priority: Streamlit secrets (cloud) -> .env / environment variable (local).
     """
     try:
         import streamlit as st
-        key = st.secrets.get("HF_API_TOKEN")
+        key = st.secrets.get("GROQ_API_KEY")
         if key:
             return str(key)
     except Exception:
         pass
-    return os.environ.get("HF_API_TOKEN")
+    return os.environ.get("GROQ_API_KEY")
 
 
 # ---------- 1. DOCUMENT LOADING ----------
@@ -142,7 +142,7 @@ class VectorStore:
         self.__init__()
 
 
-# ---------- 4. HUGGING FACE LLM ----------
+# ---------- 4. GROQ LLM ----------
 
 def build_prompt(question: str, contexts: List[str], used_fallback: bool = False) -> str:
     context_block = "\n\n---\n\n".join(contexts)
@@ -151,11 +151,11 @@ def build_prompt(question: str, contexts: List[str], used_fallback: bool = False
         if used_fallback else ""
     )
     return (
-        "<s>[INST] You are a helpful assistant. Answer the question using ONLY the context below.\n"
+        "You are a helpful assistant. Answer the question using ONLY the context below.\n"
         "If the answer is present, give it directly and quote the relevant part.\n"
         f"If the answer truly is not in the context, say so briefly.{note}\n\n"
         f"Context:\n{context_block}\n\n"
-        f"Question: {question} [/INST]"
+        f"Question: {question}"
     )
 
 
@@ -170,44 +170,31 @@ def get_answer(
         return "No document has been indexed yet. Please upload a file first."
 
     prompt = build_prompt(question, contexts, used_fallback)
-    url = f"https://api-inference.huggingface.co/models/{model}"
 
     response = requests.post(
-        url=url,
+        url=GROQ_API_URL,
         headers={
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         },
         json={
-            "inputs": prompt,
-            "parameters": {
-                "max_new_tokens": 512,
-                "temperature": 0.2,
-                "return_full_text": False,
-            },
+            "model": model,
+            "messages": [
+                {"role": "system", "content": "You are a helpful document assistant. Answer only from the provided context."},
+                {"role": "user", "content": prompt},
+            ],
+            "max_tokens": 512,
+            "temperature": 0.2,
         },
         timeout=60,
     )
 
-    if response.status_code == 503:
-        return "⏳ Model is loading on Hugging Face servers, please wait 20 seconds and try again."
-
     if response.status_code != 200:
         raise RuntimeError(
-            f"Hugging Face API error ({response.status_code}): {response.text}"
+            f"Groq API error ({response.status_code}): {response.text}"
         )
 
-    data = response.json()
-
-    # HF returns a list of generated texts
-    if isinstance(data, list) and len(data) > 0:
-        text = data[0].get("generated_text", "")
-        # Strip the prompt echo if present
-        if "[/INST]" in text:
-            text = text.split("[/INST]")[-1]
-        return text.strip()
-
-    raise RuntimeError(f"Unexpected HF response format: {data}")
+    return response.json()["choices"][0]["message"]["content"].strip()
 
 
 # ---------- 5. CHATBOT ----------
