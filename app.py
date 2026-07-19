@@ -146,7 +146,7 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown(
-        "<small style='color:#4a5280'>Document Chat Bot · Powered by Gemini</small>",
+        "<small style='color:#4a5280'>Document Chat Bot · Powered by Mistral on HuggingFace</small>",
         unsafe_allow_html=True,
     )
 
@@ -160,10 +160,10 @@ st.markdown(
 # Show a clear error if the bot failed to initialise (e.g. missing API key)
 if st.session_state.bot is None or not st.session_state.bot.is_ready():
     st.error(
-        "**API key not found.** "
+        "**API token not found.** "
         "Go to your Streamlit Cloud app → **Settings → Secrets** and add:\n\n"
-        "```toml\nGEMINI_API_KEY = \"your-gemini-api-key\"\n```\n\n"
-        "Then click **Reboot app**.",
+        "```toml\nHF_API_TOKEN = \"hf_...\"\n```\n\n"
+        "Get a free token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens), then click **Reboot app**.",
         icon="🔑",
     )
     st.stop()

@@ -20,27 +20,26 @@ from pypdf import PdfReader
 
 load_dotenv()
 
-# ── Gemini API config ─────────────────────────────────────────────────────────
-GEMINI_API_URL = (
-    "https://generativelanguage.googleapis.com/v1beta/models/"
-    "gemini-2.0-flash:generateContent"
-)
-DEFAULT_MODEL = "gemini-2.0-flash"
+# ── Hugging Face Inference API config ────────────────────────────────────────
+# Free tier: https://huggingface.co/settings/tokens
+# Model: Mistral-7B-Instruct — fast, capable, free on HF Inference API
+DEFAULT_MODEL = "mistralai/Mistral-7B-Instruct-v0.3"
+HF_API_URL = f"https://api-inference.huggingface.co/models/{DEFAULT_MODEL}"
 
 
 def _get_api_key() -> Optional[str]:
     """
-    Resolve the Gemini API key.
+    Resolve the Hugging Face API token.
     Priority: Streamlit secrets (cloud) -> .env / environment variable (local).
     """
     try:
         import streamlit as st
-        key = st.secrets.get("GEMINI_API_KEY")
+        key = st.secrets.get("HF_API_TOKEN")
         if key:
             return str(key)
     except Exception:
         pass
-    return os.environ.get("GEMINI_API_KEY")
+    return os.environ.get("HF_API_TOKEN")
 
 
 # ---------- 1. DOCUMENT LOADING ----------
@@ -143,7 +142,7 @@ class VectorStore:
         self.__init__()
 
 
-# ---------- 4. GEMINI LLM ----------
+# ---------- 4. HUGGING FACE LLM ----------
 
 def build_prompt(question: str, contexts: List[str], used_fallback: bool = False) -> str:
     context_block = "\n\n---\n\n".join(contexts)
@@ -152,12 +151,11 @@ def build_prompt(question: str, contexts: List[str], used_fallback: bool = False
         if used_fallback else ""
     )
     return (
-        "You are a helpful assistant. Answer the question using ONLY the context below.\n"
+        "<s>[INST] You are a helpful assistant. Answer the question using ONLY the context below.\n"
         "If the answer is present, give it directly and quote the relevant part.\n"
         f"If the answer truly is not in the context, say so briefly.{note}\n\n"
         f"Context:\n{context_block}\n\n"
-        f"Question: {question}\n\n"
-        "Answer:"
+        f"Question: {question} [/INST]"
     )
 
 
@@ -172,34 +170,44 @@ def get_answer(
         return "No document has been indexed yet. Please upload a file first."
 
     prompt = build_prompt(question, contexts, used_fallback)
-
-    url = f"{GEMINI_API_URL}?key={api_key}"
+    url = f"https://api-inference.huggingface.co/models/{model}"
 
     response = requests.post(
         url=url,
-        headers={"Content-Type": "application/json"},
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
         json={
-            "contents": [
-                {"parts": [{"text": prompt}]}
-            ],
-            "generationConfig": {
-                "maxOutputTokens": 600,
+            "inputs": prompt,
+            "parameters": {
+                "max_new_tokens": 512,
                 "temperature": 0.2,
+                "return_full_text": False,
             },
         },
         timeout=60,
     )
 
+    if response.status_code == 503:
+        return "⏳ Model is loading on Hugging Face servers, please wait 20 seconds and try again."
+
     if response.status_code != 200:
         raise RuntimeError(
-            f"Gemini API error ({response.status_code}): {response.text}"
+            f"Hugging Face API error ({response.status_code}): {response.text}"
         )
 
     data = response.json()
-    try:
-        return data["candidates"][0]["content"]["parts"][0]["text"]
-    except (KeyError, IndexError) as e:
-        raise RuntimeError(f"Unexpected Gemini response format: {data}") from e
+
+    # HF returns a list of generated texts
+    if isinstance(data, list) and len(data) > 0:
+        text = data[0].get("generated_text", "")
+        # Strip the prompt echo if present
+        if "[/INST]" in text:
+            text = text.split("[/INST]")[-1]
+        return text.strip()
+
+    raise RuntimeError(f"Unexpected HF response format: {data}")
 
 
 # ---------- 5. CHATBOT ----------
